@@ -13,8 +13,10 @@ class SocketIn {
       this.raw.add(event);
     }, onDone: () {
       this.raw.done();
+      this.conn.destroy();
     }, onError: (err) {
       this.raw.err(err);
+      this.conn.close();
     });
   }
   Socket conn;
