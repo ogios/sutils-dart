@@ -3,7 +3,6 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ogios_sutils/buffer.dart';
 import 'package:ogios_sutils/in.dart';
 import 'package:ogios_sutils/out.dart';
 
@@ -89,16 +88,16 @@ Future test3() async {
   await so.writeTo(s);
   SocketIn si = SocketIn(conn: s);
   int len = await si.next();
-  print("sec length: $len");
+  // print("sec length: $len");
   Uint8List sec = await si.getSec();
-  print("sec: $sec");
-  print("sec to string: ${String.fromCharCodes(sec)}");
+  // print("sec: $sec");
+  // print("sec to string: ${String.fromCharCodes(sec)}");
   if (len == 1 && sec[0] == 200) {
     len = await si.next();
-    print("sec length: $len");
+    // print("sec length: $len");
     sec = await si.getSec();
-    print("sec: $sec");
-    print("sec to string: ${String.fromCharCodes(sec)}");
+    // print("sec: $sec");
+    // print("sec to string: ${String.fromCharCodes(sec)}");
   }
 }
 

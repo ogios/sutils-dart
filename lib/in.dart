@@ -58,7 +58,7 @@ class SocketIn {
     } else {
       int length = await this.next();
       Uint8List temp = Uint8List(length);
-      int readlength = await this.raw.read(temp);
+      int readlength = await this.read(temp);
       if (readlength != length) {
       }
       return temp;

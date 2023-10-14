@@ -1,6 +1,6 @@
 name: ogios_sutils
 description: For easier use of socket data transmit, including SocketBuffer, In and Out.
-version: 0.0.2
+version: 0.0.4
 homepage: https://github.com/ogios/sutils-dart
 
 environment:

@@ -10,17 +10,17 @@ class SocketOut {
   List<Object> raw = [];
   List<int> types = [];
 
-  void add(Object raw, int t, Uint8List lenb) {
+  void _add(Object raw, int t, Uint8List lenb) {
     this.raw.add(lenb);
     this.raw.add(raw);
     this.types.add(t);
   }
 
-  Uint8List _main(int last, int index) {
+  static Uint8List _main(int last, int index) {
     Uint8List bytes;
     if (last >= 255) {
       int current = last % 255;
-      bytes = this._main((last / 255).toInt(), index + 1);
+      bytes = _main((last / 255).toInt(), index + 1);
       bytes[index] = current;
     } else {
       bytes = Uint8List(index + 2);
@@ -30,19 +30,19 @@ class SocketOut {
     return bytes;
   }
 
-  Uint8List getLength(int length) {
-    return this._main(length, 0);
+  static Uint8List getLength(int length) {
+    return _main(length, 0);
   }
 
   void addBytes(Uint8List raw) {
     int length = raw.length;
-    Uint8List content_length = this.getLength(length);
-    this.add(raw, OUT_TYPE_BYTES, content_length);
+    Uint8List content_length = getLength(length);
+    this._add(raw, OUT_TYPE_BYTES, content_length);
   }
 
   void addReader(Stream raw, int length) {
-    Uint8List content_length = this.getLength(length);
-    this.add(raw, OUT_TYPE_READER, content_length);
+    Uint8List content_length = getLength(length);
+    this._add(raw, OUT_TYPE_READER, content_length);
   }
 
   Future writeTo(Socket writer) async {
