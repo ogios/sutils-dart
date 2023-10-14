@@ -162,7 +162,6 @@ class SocketBuffer {
     int total = 0;
     int left = emptybs.length;
 
-    Object? e;
     while (left > 0 && (!this._done || _length != 0)) {
       checkErr();
       while (_length == 0) {

@@ -11,29 +11,51 @@ and the Flutter guide for
 [developing packages and plugins](https://flutter.dev/developing-packages).
 -->
 
-TODO: Put a short description of the package here that helps potential users
-know whether this package might be useful for them.
+Socket tools for easier and faster use.
+
 
 ## Features
-
-TODO: List what your package can do. Maybe include images, gifs, or videos.
+- `SocketBuffer` allows to read bytes with the given length: `readNBytes(int len)`&`read(byte[])`.
+- Byte tools `SocketIn` & `SocketOut` easy to build and read socket body with the given structure.
 
 ## Getting started
 
-TODO: List prerequisites and provide or point to information on how to
-start using the package.
-
 ## Usage
 
-TODO: Include short and useful examples for package users. Add longer examples
-to `/example` folder.
-
+### Customize Socket Buffer
+provide functions like java(`readNBytes(int len)`&`read(byte[])`) / go(`read(byte[])`)
 ```dart
-const like = 'sample';
+  Socket s = await Socket.connect("localhost", 15002);
+  SocketBuffer buffer = SocketBuffer();
+  s.write("shit");
+  s.listen((event) {
+    log("${event.length}");
+    buffer.add(event);
+  }, onDone: () {
+    buffer.done();
+    s.destroy();
+  }, onError: (err, stack) {
+    buffer.err(err);
+    s.close();
+  });
+  Uint8List bs = await buffer.readN(1);
+  print(bs);
+`````
+
+### Byte tools
+
+base*255 with the last byte of `255` ends the length block
+
+- section
+```
+section_content_length (base-255) + section_content
+```
+- body:
+```
+section + section + ...
 ```
 
-## Additional information
 
-TODO: Tell users more about the package: where to find more information, how to
-contribute to the package, how to file issues, what response they can expect
-from the package authors, and more.
+<!--
+## Additional information
+-->
