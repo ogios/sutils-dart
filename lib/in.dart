@@ -41,7 +41,7 @@ class SocketIn {
 
   Future<int> next() async {
     if (this.CurrSecLength < this.readed) {
-    throw new Exception("please read all of current section");
+      throw new Exception("please read all of current section");
     }
     int total = await this._main(index: 0, t: 0);
     this.CurrSecLength = total;

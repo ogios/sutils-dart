@@ -2,34 +2,35 @@ import 'dart:developer';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:flutter_test/flutter_test.dart';
 import 'package:ogios_sutils/buffer.dart';
 import 'package:ogios_sutils/in.dart';
 import 'package:ogios_sutils/out.dart';
 
-Future<void> test() async {
-  Socket s = await Socket.connect("localhost", 15002);
-  SocketBuffer buffer = SocketBuffer();
-  s.write("shit");
-  s.listen((event) {
-    log("${event.length}");
-    buffer.add(event);
-  }, onDone: () {
-    buffer.done();
-    s.destroy();
-  }, onError: (err, stack) {
-    buffer.err(err);
-    s.close();
-  });
-  try {
-    while (true) {
-      Uint8List bs = await buffer.readN(1024);
-      log("$bs");
-    }
-  } catch (err) {
-    log("ERROR: $err");
-  }
-  log("done");
-}
+// Future<void> test() async {
+//   Socket s = await Socket.connect("localhost", 15002);
+//   SocketBuffer buffer = SocketBuffer();
+//   s.write("shit");
+//   s.listen((event) {
+//     log("${event.length}");
+//     buffer.add(event);
+//   }, onDone: () {
+//     buffer.done();
+//     s.destroy();
+//   }, onError: (err, stack) {
+//     buffer.err(err);
+//     s.close();
+//   });
+//   try {
+//     while (true) {
+//       Uint8List bs = await buffer.readN(1024);
+//       log("$bs");
+//     }
+//   } catch (err) {
+//     log("ERROR: $err");
+//   }
+//   log("done");
+// }
 
 void test1() {
   Uint8List a = Uint8List(1);
@@ -79,8 +80,34 @@ void test2() async {
   test2_client();
 }
 
+Future test3() async {
+  Socket s = await Socket.connect("localhost", 15001);
+  SocketOut so = SocketOut();
+  so.addBytes(Uint8List.fromList("fetch".codeUnits));
+  so.addBytes(Uint8List.fromList([0]));
+  so.addBytes(Uint8List.fromList([10]));
+  await so.writeTo(s);
+  SocketIn si = SocketIn(conn: s);
+  int len = await si.next();
+  print("sec length: $len");
+  Uint8List sec = await si.getSec();
+  print("sec: $sec");
+  print("sec to string: ${String.fromCharCodes(sec)}");
+  if (len == 1 && sec[0] == 200) {
+    len = await si.next();
+    print("sec length: $len");
+    sec = await si.getSec();
+    print("sec: $sec");
+    print("sec to string: ${String.fromCharCodes(sec)}");
+  }
+}
+
 void main() {
   // test();
-  // test1();
-  test2();
+
+  test("socket test", () async {
+    // test1();
+    // test2();
+    await test3();
+  });
 }

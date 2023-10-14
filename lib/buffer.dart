@@ -114,7 +114,7 @@ class SocketBuffer {
     checkErr();
     if (length == 0) return _emptyList;
     Uint8List buffer = Uint8List(length);
-    int read = await this.read(buffer);
+    int read = await this._read(buffer);
     if (read == 0) throw Exception("EOF");
     return buffer.sublist(0, read);
   }
