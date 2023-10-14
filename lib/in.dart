@@ -52,7 +52,7 @@ class SocketIn {
   Future<Uint8List> getSec() async {
     if (this.readed < this.CurrSecLength) {
       Uint8List bs = Uint8List(this.CurrSecLength-this.readed);
-      int readed = await this.raw.read(bs);
+      int readed = await this.read(bs);
       this.readed += readed;
       return bs;
     } else {
