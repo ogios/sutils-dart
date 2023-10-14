@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -39,7 +40,7 @@ class SocketOut {
     this.add(raw, OUT_TYPE_BYTES, content_length);
   }
 
-  void addReader(File raw, int length) {
+  void addReader(Stream raw, int length) {
     Uint8List content_length = this.getLength(length);
     this.add(raw, OUT_TYPE_READER, content_length);
   }
@@ -54,28 +55,23 @@ class SocketOut {
         switch (t) {
           case OUT_TYPE_BYTES:
             writer.add(input as Uint8List);
-            writer.flush();
             break;
           case OUT_TYPE_READER:
             Stream reader = input as Stream;
-            bool done = false;
-            reader.listen((event) async {
+            Completer completer = Completer();
+            reader.listen((event) {
               writer.add(event);
-              writer.flush();
             }, onError: (err){
               throw err;
             }, onDone: (){
-              done = true;
+              completer.complete();
             });
-            while (done) {
-              await Future.delayed(Duration(milliseconds: 10));
-            }
+            await completer.future;
             break;
           default:
             break;
         }
       }
     }
-    // writer.flush();
   }
 }

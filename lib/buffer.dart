@@ -109,59 +109,87 @@ class SocketBuffer {
     return x + 1;
   }
 
-  Future<Uint8List> readN(int length) async {
-    if (this._done) throw Exception("EOF");
+  Future<Uint8List> _readN(int length) async {
+    if (this._done && _length == 0) throw Exception("EOF");
     checkErr();
     if (length == 0) return _emptyList;
-    Uint8List buffer = Uint8List(1);
+    Uint8List buffer = Uint8List(length);
     int read = await this.read(buffer);
     if (read == 0) throw Exception("EOF");
     return buffer.sublist(0, read);
   }
 
+  Future<Uint8List> readN(int length) async {
+    Object? err;
+    Uint8List? data;
+    m.acquire();
+    try {
+      data = await this._readN(length);
+    } catch (e) {
+      err = e;
+    } finally {
+      m.release();
+    }
+    if (err != null) {
+      throw err;
+    } else {
+      return data!;
+    }
+  }
+
   Future<int> read(Uint8List emptybs) async {
-    if (this._done) throw Exception("EOF");
+    Object? err;
+    int data = 0;
+    m.acquire();
+    try {
+      data = await this._read(emptybs);
+    } catch (e) {
+      err = e;
+    } finally {
+      m.release();
+    }
+    if (err != null) {
+      throw err;
+    } else {
+      return data;
+    }
+  }
+
+  Future<int> _read(Uint8List emptybs) async {
+    if (this._done && _length == 0) throw Exception("EOF");
     if (emptybs.length == 0) return 0;
     int inputIndex = 0;
     int total = 0;
     int left = emptybs.length;
 
-    m.acquire();
     Object? e;
-    try {
-      while (left > 0 && (!this._done || _length != 0)) {
+    while (left > 0 && (!this._done || _length != 0)) {
+      checkErr();
+      while (_length == 0) {
         checkErr();
-        while (_length == 0) {
-          checkErr();
-          if (this._done && _length == 0){
-            break;
-          }
-          await Future.delayed(Duration(milliseconds: 10));
+        if (this._done && _length == 0) {
+          break;
         }
-        if (_length <= left) {
-          emptybs.setRange(inputIndex, _length, _buffer);
-          total += _length;
-          left -= _length;
-          inputIndex += _length;
-          _clear();
-        } else {
-          emptybs.setRange(inputIndex, emptybs.length,
-              Uint8List.view(_buffer.buffer, _readIndex, left));
-          total += left;
-          inputIndex += left;
-          _readIndex += left;
-          _length -= left;
-          left = 0;
-          _decrease();
-        }
+        await Future.delayed(Duration(milliseconds: 10));
       }
-      return total;
-    } catch (err) {
-      e = err;
-    } finally {
-      m.release();
+      if (_length <= left) {
+        emptybs.setRange(inputIndex, _length, _buffer.sublist(_readIndex));
+        total += _length;
+        left -= _length;
+        inputIndex += _length;
+        _clear();
+      } else {
+        emptybs.setRange(inputIndex, emptybs.length,
+            Uint8List.view(_buffer.buffer, _readIndex, left));
+        total += left;
+        inputIndex += left;
+        _readIndex += left;
+        _length -= left;
+        left = 0;
+        _decrease();
+      }
     }
-    throw e;
+    return total;
   }
 
   bool _done = false;

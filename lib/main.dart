@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:ogios_sutils/buffer.dart';
@@ -39,13 +38,21 @@ void test1() {
 Future test2_server() async {
   ServerSocket serverSocket = await ServerSocket.bind("localhost", 15002);
   await for (var socket in serverSocket) {
-    print("received new conn: ${socket.remoteAddress}");
+    print("received new conn: ${socket.remoteAddress} - ${socket.remotePort}");
+    var bs = Uint8List.fromList("hi from server".codeUnits);
     SocketOut so = SocketOut();
-    so.addBytes(Uint8List.fromList("hi from server".codeUnits));
+    so.addBytes(bs);
+    File f = File("/home/ogios/work/andorid/ogios_sutils/test/test.txt");
+    int size = (await f.stat()).size;
+    print("file size: $size - ${size == f.lengthSync()}");
+    so.addReader(f.openRead(), (await f.stat()).size);
     await so.writeTo(socket);
-    // socket.close();
+    print("closing...");
+    await serverSocket.close();
+    await socket.close();
     break;
   }
+  await serverSocket.close();
   print("server done.");
 }
 
@@ -56,7 +63,13 @@ Future test2_client() async {
   print("sec length: $len");
   Uint8List sec = await si.getSec();
   print("sec: $sec");
-  s.close();
+
+  len = await si.next();
+  print("sec length: $len");
+  sec = await si.getSec();
+  print("sec: $sec");
+  s.destroy();
+  // await s.close();
   print("client done");
 }
 
