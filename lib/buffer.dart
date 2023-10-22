@@ -136,7 +136,7 @@ class SocketBuffer {
           // else
           if (_available <= left) {
             // if available data is not enough
-            emptybs.setRange(inputIndex, _available, _buffer.sublist(_readIndex));
+            emptybs.setRange(inputIndex, inputIndex + _available, _buffer.sublist(_readIndex));
             total += _available;
             left -= _available;
             inputIndex += _available;

@@ -1,3 +1,6 @@
+## 0.0.7
+- fix large list range error
+
 ## 0.0.6
 - improve sync lock in buffer
 - add tests
