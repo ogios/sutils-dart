@@ -1,3 +1,7 @@
+## 0.0.6
+- improve sync lock in buffer
+- add tests
+
 ## 0.0.4 & 0.0.5
 - fix getSec read from raw
 

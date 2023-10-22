@@ -1,7 +1,7 @@
 library ogios_sutils;
 
 import 'dart:typed_data';
-import 'package:mutex/mutex.dart';
+import 'package:synchronized/synchronized.dart';
 
 class SocketBuffer {
   /// Initial size of internal buffer.
@@ -16,10 +16,13 @@ class SocketBuffer {
   static final _emptyList = Uint8List(0);
 
   /// lock
-  final Mutex m = Mutex();
+  final Lock lock = Lock();
 
   /// Current count of bytes written to buffer.
-  int _length = 0;
+  int _available = 0;
+  int get length => _available;
+  bool get isEmpty => _available == 0;
+  bool get isNotEmpty => _available != 0;
 
   /// Current readed index.
   int _readIndex = 0;
@@ -31,31 +34,29 @@ class SocketBuffer {
 
   SocketBuffer() : _buffer = _emptyList;
 
-  void add(List<int> bytes) {
-    m.acquire();
-    Object? e;
-    try {
+  void add(List<int> bytes) async {
+    // sync lock with read and clear
+    await lock.synchronized(()async {
       int byteCount = bytes.length;
       if (byteCount == 0) return;
-      int required = _length + byteCount;
+      // how long the list should be to contain all bytes
+      int required = _available + byteCount;
+      // expand buffer list if space is not enough
       if (_buffer.length < required) {
         _grow(required);
       }
       assert(_buffer.length >= required);
+      // add to buffer
       if (bytes is Uint8List) {
-        _buffer.setRange(_length, required, bytes);
+        _buffer.setRange(_available, required, bytes);
       } else {
         for (int i = 0; i < byteCount; i++) {
-          _buffer[_length + i] = bytes[i];
+          _buffer[_available + i] = bytes[i];
         }
       }
-      _length = required;
-    } catch (err) {
-      e = err;
-    } finally {
-      m.release();
-    }
-    if (e != null) throw e;
+      // update available bytes
+      _available = required;
+    });
   }
 
   void _grow(int required) {
@@ -72,29 +73,17 @@ class SocketBuffer {
     _buffer = newBuffer;
   }
 
-  void _decrease() {
+  void _decrease() async {
+    // if not pass the threshold, do nothing.
     if (_readIndex < _threshold) return;
-    var length = _buffer.length - (_readIndex + 1);
-    var newBuffer = Uint8List(length);
-    newBuffer.setRange(0, length, Uint8List.view(_buffer.buffer, _readIndex));
-    _readIndex = 0;
-    _buffer = newBuffer;
-  }
-
-  int get length => _length;
-
-  bool get isEmpty => _length == 0;
-
-  bool get isNotEmpty => _length != 0;
-
-  void clear() {
-    _clear();
-  }
-
-  void _clear() {
-    _length = 0;
-    _readIndex = 0;
-    _buffer = _emptyList;
+    // else, clear data before read index. (sync lock with add and read)
+    await lock.synchronized(() async {
+      var length = _buffer.length - (_readIndex + 1);
+      var newBuffer = Uint8List(length);
+      newBuffer.setRange(0, length, Uint8List.view(_buffer.buffer, _readIndex));
+      _buffer = newBuffer;
+      _readIndex = 0;
+    });
   }
 
   /// Rounds numbers <= 2^32 up to the nearest power of 2.
@@ -110,7 +99,7 @@ class SocketBuffer {
   }
 
   Future<Uint8List> _readN(int length) async {
-    if (this._done && _length == 0) throw Exception("EOF");
+    if (this._done && _available == 0) throw Exception("EOF");
     checkErr();
     if (length == 0) return _emptyList;
     Uint8List buffer = Uint8List(length);
@@ -120,74 +109,55 @@ class SocketBuffer {
   }
 
   Future<Uint8List> readN(int length) async {
-    Object? err;
-    Uint8List? data;
-    m.acquire();
-    try {
-      data = await this._readN(length);
-    } catch (e) {
-      err = e;
-    } finally {
-      m.release();
-    }
-    if (err != null) {
-      throw err;
-    } else {
-      return data!;
-    }
+    return await this._readN(length);
   }
 
   Future<int> read(Uint8List emptybs) async {
-    Object? err;
-    int data = 0;
-    m.acquire();
-    try {
-      data = await this._read(emptybs);
-    } catch (e) {
-      err = e;
-    } finally {
-      m.release();
-    }
-    if (err != null) {
-      throw err;
-    } else {
-      return data;
-    }
+    return await this._read(emptybs);
   }
 
   Future<int> _read(Uint8List emptybs) async {
-    if (this._done && _length == 0) throw Exception("EOF");
+    if (this._done && _available == 0) throw Exception("EOF");
     if (emptybs.length == 0) return 0;
     int inputIndex = 0;
     int total = 0;
     int left = emptybs.length;
 
-    while (left > 0 && (!this._done || _length != 0)) {
+    while (left > 0 && (!this._done || _available != 0)) {
       checkErr();
-      while (_length == 0) {
-        checkErr();
-        if (this._done && _length == 0) {
-          break;
+      bool wait_flag = false;
+
+      // sync with add and done
+      await lock.synchronized(() async {
+        if (_available == 0) {
+          // if no data, wait for 10ms
+          wait_flag = true;
+        } else {
+          // else
+          if (_available <= left) {
+            // if available data is not enough
+            emptybs.setRange(inputIndex, _available, _buffer.sublist(_readIndex));
+            total += _available;
+            left -= _available;
+            inputIndex += _available;
+            _readIndex += _available;
+            _available = 0;
+          } else {
+            // else fill up empty list
+            emptybs.setRange(inputIndex, emptybs.length,
+                Uint8List.view(_buffer.buffer, _readIndex, left));
+            total += left;
+            inputIndex += left;
+            _readIndex += left;
+            _available -= left;
+            left = 0;
+          }
         }
-        await Future.delayed(Duration(milliseconds: 10));
-      }
-      if (_length <= left) {
-        emptybs.setRange(inputIndex, _length, _buffer.sublist(_readIndex));
-        total += _length;
-        left -= _length;
-        inputIndex += _length;
-        _clear();
-      } else {
-        emptybs.setRange(inputIndex, emptybs.length,
-            Uint8List.view(_buffer.buffer, _readIndex, left));
-        total += left;
-        inputIndex += left;
-        _readIndex += left;
-        _length -= left;
-        left = 0;
-        _decrease();
-      }
+      });
+      // wait for data
+      if (wait_flag) await Future.delayed(Duration(milliseconds: 10));
     }
+    _decrease();
     return total;
   }
 

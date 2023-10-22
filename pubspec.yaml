@@ -1,6 +1,6 @@
 name: ogios_sutils
 description: For easier use of socket data transmit, including SocketBuffer, In and Out.
-version: 0.0.5
+version: 0.0.6
 homepage: https://github.com/ogios/sutils-dart
 
 environment:
@@ -10,7 +10,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  mutex: ^3.1.0
+  synchronized: ^3.1.0
 
 
 dev_dependencies:

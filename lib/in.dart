@@ -67,7 +67,7 @@ class SocketIn {
 
   Future<int> read(Uint8List buf) async {
     if (this.CurrSecLength == this.readed) {
-      throw new Exception("no more bytes for current section");
+      throw Exception("no more bytes for current section");
     }
     if (buf.length <= this.CurrSecLength-this.readed) {
       int i = await this.raw.read(buf);
