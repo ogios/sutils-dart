@@ -1,5 +1,6 @@
 library ogios_sutils;
 
+import 'dart:developer';
 import 'dart:typed_data';
 import 'package:synchronized/synchronized.dart';
 
@@ -24,8 +25,11 @@ class SocketBuffer {
   bool get isEmpty => _available == 0;
   bool get isNotEmpty => _available != 0;
 
-  /// Current readed index.
+  /// Current read index.
   int _readIndex = 0;
+
+  /// Current save index
+  int _saveIndex = 0;
 
   /// Internal buffer accumulating bytes.
   ///
@@ -36,11 +40,11 @@ class SocketBuffer {
 
   void add(List<int> bytes) async {
     // sync lock with read and clear
-    await lock.synchronized(()async {
+    await lock.synchronized(() async {
       int byteCount = bytes.length;
       if (byteCount == 0) return;
       // how long the list should be to contain all bytes
-      int required = _available + byteCount;
+      int required = _saveIndex + byteCount;
       // expand buffer list if space is not enough
       if (_buffer.length < required) {
         _grow(required);
@@ -48,14 +52,18 @@ class SocketBuffer {
       assert(_buffer.length >= required);
       // add to buffer
       if (bytes is Uint8List) {
-        _buffer.setRange(_available, required, bytes);
+        _buffer.setRange(_saveIndex, required, bytes);
       } else {
         for (int i = 0; i < byteCount; i++) {
-          _buffer[_available + i] = bytes[i];
+          _buffer[_saveIndex + i] = bytes[i];
         }
       }
       // update available bytes
-      _available = required;
+      _saveIndex = required;
+      _available += byteCount;
+
+      // debug
+      if (debug) log("Buffer add: $byteCount | Buffer available: $_available | save_index: $_saveIndex | Buffer capacity: ${_buffer.length}");
     });
   }
 
@@ -73,7 +81,7 @@ class SocketBuffer {
     _buffer = newBuffer;
   }
 
-  void _decrease() async {
+  void clear() async {
     // if not pass the threshold, do nothing.
     if (_readIndex < _threshold) return;
     // else, clear data before read index. (sync lock with add and read)
@@ -82,6 +90,7 @@ class SocketBuffer {
       var newBuffer = Uint8List(length);
       newBuffer.setRange(0, length, Uint8List.view(_buffer.buffer, _readIndex));
       _buffer = newBuffer;
+      _saveIndex -= _readIndex;
       _readIndex = 0;
     });
   }
@@ -120,7 +129,7 @@ class SocketBuffer {
     if (this._done && _available == 0) throw Exception("EOF");
     if (emptybs.length == 0) return 0;
     int inputIndex = 0;
-    int total = 0;
+    int total_read = 0;
     int left = emptybs.length;
 
     while (left > 0 && (!this._done || _available != 0)) {
@@ -136,17 +145,20 @@ class SocketBuffer {
           // else
           if (_available <= left) {
             // if available data is not enough
-            emptybs.setRange(inputIndex, inputIndex + _available, _buffer.sublist(_readIndex));
-            total += _available;
+            if (debug) log("(NOT ENOUGH) | left: $left | ava_before: ${_available} | ava_after: ${0} | readInd_before: ${_readIndex} | readInd_after: ${_readIndex + _available}");
+            emptybs.setRange(inputIndex, inputIndex + _available,
+                _buffer.sublist(_readIndex, _readIndex + _available));
+            total_read += _available;
             left -= _available;
             inputIndex += _available;
             _readIndex += _available;
             _available = 0;
           } else {
             // else fill up empty list
+            if(debug) log("(FILL LEFT) | left: $left | ava_before: ${_available} | ava_after: ${_available - left} | readInd_before: ${_readIndex} | readInd_after: ${_readIndex + left}");
             emptybs.setRange(inputIndex, emptybs.length,
                 Uint8List.view(_buffer.buffer, _readIndex, left));
-            total += left;
+            total_read += left;
             inputIndex += left;
             _readIndex += left;
             _available -= left;
@@ -155,11 +167,16 @@ class SocketBuffer {
         }
       });
       // wait for data
-      if (wait_flag) await Future.delayed(Duration(milliseconds: 10));
+      if (wait_flag) await Future.delayed(const Duration(milliseconds: 10));
     }
-    _decrease();
-    return total;
+
+    // debug
+    if (debug) log("return total_read: $total_read");
+    return total_read;
   }
+
+  //debug
+  bool debug = false;
 
   bool _done = false;
   Exception? _err;

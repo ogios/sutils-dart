@@ -4,11 +4,12 @@ import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 
-import 'package:ogios_sutils/buffer.dart';
+import './buffer.dart';
 
 class SocketIn {
-  SocketIn({required this.conn}) {
+  SocketIn({required this.conn, debug = false}) {
     this.raw = SocketBuffer();
+    this.raw.debug = debug;
     this.conn.listen((event) {
       this.raw.add(event);
     }, onDone: () {
@@ -41,7 +42,7 @@ class SocketIn {
 
   Future<int> next() async {
     if (this.CurrSecLength < this.readed) {
-      throw new Exception("please read all of current section");
+      throw Exception("please read all of current section");
     }
     int total = await this._main(index: 0, t: 0);
     this.CurrSecLength = total;

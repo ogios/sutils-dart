@@ -1,3 +1,10 @@
+## 0.1.0
+- !fix add bytes mismatch index
+- add debug mode in `SocketIn` & `SocketBuffer`
+
+## 0.0.8
+- make buffer `clear()` public and remove `clear()` in `_read()`
+
 ## 0.0.7
 - fix large list range error
 
